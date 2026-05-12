@@ -186,30 +186,124 @@ def load_vector_store(user_id=None):
     return db
 
 # -------- LLM (Gemini 2.5 Flash) --------
-def get_llm():
-    from langchain_google_genai import ChatGoogleGenerativeAI
+# def get_llm():
+#     from langchain_google_genai import ChatGoogleGenerativeAI
 
-    """Get the Gemini LLM - using Gemini 2.5 Flash"""
-    return ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",  # Confirmed available in 2026 environment
-        temperature=0.3,
-        google_api_key=GOOGLE_API_KEY
+#     """Get the Gemini LLM - using Gemini 2.5 Flash"""
+#     return ChatGoogleGenerativeAI(
+#         model="gemini-2.5-flash",  # Confirmed available in 2026 environment
+#         temperature=0.3,
+#         google_api_key=GOOGLE_API_KEY
+#     )
+
+
+# # -------- MCQ GENERATION WITH JSON OUTPUT --------
+# def generate_mcq_json(context, mcq_count, specific_topic=None):
+#     """Generate MCQs in JSON format from the provided context"""
+    
+#     topic_instruction = ""
+#     if specific_topic:
+#         topic_instruction = f"""
+# IMPORTANT: Generate all questions specifically about the topic: "{specific_topic}"
+# The topic for EACH question MUST be "{specific_topic}".
+# """
+    
+#     prompt = PromptTemplate.from_template(
+#         """
+# You are an expert at creating high-quality multiple-choice questions (MCQs) from given content.
+
+# Generate EXACTLY {mcq_count} multiple-choice questions.
+
+# {topic_instruction}
+
+# IMPORTANT RULES:
+# 1. Respond with ONLY valid JSON.
+# 2. Generate questions, options, correct answers, and explanations IN THE SAME LANGUAGE AS THE PROVIDED CONTEXT.
+# 3. No markdown formatting, no additional text, no explanations outside JSON.
+# 4. Each question must have exactly 4 options (A, B, C, D).
+# 5. Only ONE correct answer per question.
+# 6. Mark the correct answer with its letter (A, B, C, or D).
+# 7. For EVERY question, provide a HIGHLY SPECIFIC topic name based on what the question is testing. This topic MUST NOT be "General" or "Concept Understanding".
+# 8. The topic for EACH question MUST be a concise, specific phrase (e.g., "Photosynthesis Process", "Types of Volcanoes", "Indian History: Mughal Empire").
+
+# The JSON structure MUST be exactly like this:
+# {{
+#     "mcqs": [
+#         {{
+#             "question_number": 1,
+#             "question_text": "What is the main topic discussed?",
+#             "options": {{
+#                 "A": "First option",
+#                 "B": "Second option",
+#                 "C": "Third option",
+#                 "D": "Fourth option"
+#             }},
+#             "correct_answer": "B",
+#             "explanation": "Brief explanation why B is correct",
+#             "topic": "HIGHLY SPECIFIC CONCEPT NAME"
+#         }}
+#     ]
+# }}
+
+# Context:
+# {context}
+
+# Generate {mcq_count} MCQs. REMEMBER: Each question MUST have a HIGHLY SPECIFIC topic (NOT 'General' or 'Concept Understanding'):
+# """
+#     )
+
+#     chain = prompt | get_llm() | StrOutputParser()
+    
+#     for _ in range(2): # Retry mechanism
+#         try:
+#             result = chain.invoke({
+#                 "context": context,
+#                 "mcq_count": mcq_count,
+#                 "topic_instruction": topic_instruction
+#             })
+            
+#             # Directly parse the result, as parse_json_mcqs is now robust
+#             mcqs = parse_json_mcqs(result)
+#             if mcqs:
+#                 return result # Return raw result for further processing if needed
+            
+#         except Exception as e:
+#             continue # Try again
+            
+#     raise Exception("Failed to generate valid MCQs after multiple attempts.")
+
+from huggingface_hub import InferenceClient
+import os
+import json
+import re
+
+HF_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
+
+
+def get_llm():
+    """Return HuggingFace Inference Client"""
+
+    if not HF_API_KEY:
+        raise ValueError("HUGGINGFACE_API_KEY not found.")
+
+    return InferenceClient(
+        api_key=HF_API_KEY,
     )
 
 
 # -------- MCQ GENERATION WITH JSON OUTPUT --------
 def generate_mcq_json(context, mcq_count, specific_topic=None):
     """Generate MCQs in JSON format from the provided context"""
-    
+
     topic_instruction = ""
+
     if specific_topic:
         topic_instruction = f"""
 IMPORTANT: Generate all questions specifically about the topic: "{specific_topic}"
 The topic for EACH question MUST be "{specific_topic}".
 """
-    
-    prompt = PromptTemplate.from_template(
-        """
+
+    prompt = f"""
 You are an expert at creating high-quality multiple-choice questions (MCQs) from given content.
 
 Generate EXACTLY {mcq_count} multiple-choice questions.
@@ -223,24 +317,24 @@ IMPORTANT RULES:
 4. Each question must have exactly 4 options (A, B, C, D).
 5. Only ONE correct answer per question.
 6. Mark the correct answer with its letter (A, B, C, or D).
-7. For EVERY question, provide a HIGHLY SPECIFIC topic name based on what the question is testing. This topic MUST NOT be "General" or "Concept Understanding".
-8. The topic for EACH question MUST be a concise, specific phrase (e.g., "Photosynthesis Process", "Types of Volcanoes", "Indian History: Mughal Empire").
+7. For EVERY question, provide a HIGHLY SPECIFIC topic name based on what the question is testing.
+8. The topic for EACH question MUST be concise and specific.
 
-The JSON structure MUST be exactly like this:
+JSON FORMAT:
 {{
     "mcqs": [
         {{
             "question_number": 1,
-            "question_text": "What is the main topic discussed?",
+            "question_text": "Question here",
             "options": {{
-                "A": "First option",
-                "B": "Second option",
-                "C": "Third option",
-                "D": "Fourth option"
+                "A": "Option A",
+                "B": "Option B",
+                "C": "Option C",
+                "D": "Option D"
             }},
-            "correct_answer": "B",
-            "explanation": "Brief explanation why B is correct",
-            "topic": "HIGHLY SPECIFIC CONCEPT NAME"
+            "correct_answer": "A",
+            "explanation": "Explanation here",
+            "topic": "Specific Topic"
         }}
     ]
 }}
@@ -248,31 +342,38 @@ The JSON structure MUST be exactly like this:
 Context:
 {context}
 
-Generate {mcq_count} MCQs. REMEMBER: Each question MUST have a HIGHLY SPECIFIC topic (NOT 'General' or 'Concept Understanding'):
+Generate {mcq_count} MCQs now.
 """
-    )
 
-    chain = prompt | get_llm() | StrOutputParser()
-    
-    for _ in range(2): # Retry mechanism
+    client = get_llm()
+
+    for _ in range(2):
+
         try:
-            result = chain.invoke({
-                "context": context,
-                "mcq_count": mcq_count,
-                "topic_instruction": topic_instruction
-            })
-            
-            # Directly parse the result, as parse_json_mcqs is now robust
+            completion = client.chat.completions.create(
+                model="deepseek-ai/DeepSeek-V4-Pro:novita",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                max_tokens=2500,
+                temperature=0.3,
+            )
+
+            result = completion.choices[0].message.content
+
             mcqs = parse_json_mcqs(result)
+
             if mcqs:
-                return result # Return raw result for further processing if needed
-            
+                return result
+
         except Exception as e:
-            continue # Try again
-            
+            print(f"MCQ generation error: {e}")
+            continue
+
     raise Exception("Failed to generate valid MCQs after multiple attempts.")
-
-
 
 
 

@@ -51,31 +51,79 @@ def generate_audio_from_text(text, language_code="en-IN", speaker="shubh", pace=
             pass
         raise Exception(f"Sarvam AI API error: {error_msg}")
 
+# def generate_content_for_audio(topic, style, duration):
+#     """
+#     Generate content using Gemini (since it's already used in the project)
+#     to be converted into audio.
+#     """
+#     import google.generativeai as genai
+    
+#     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+#     if not GOOGLE_API_KEY:
+#         raise ValueError("GOOGLE_API_KEY not found.")
+        
+#     genai.configure(api_key=GOOGLE_API_KEY)
+#     model = genai.GenerativeModel("gemini-2.5-flash")
+    
+#     print(f"Generating script for topic: {topic}, style: {style}")
+#     prompt = f"""
+#     You are an expert content creator. Generate a script for a {style} about the topic: "{topic}".
+#     The script should be approximately {duration} minutes long when spoken.
+    
+#     Style: {style}
+#     Topic: {topic}
+#     Estimated Duration: {duration} minutes
+    
+#     Provide ONLY the script text, without any stage directions or meta-information.
+#     """
+    
+#     response = model.generate_content(prompt)
+#     return response.text
+
 def generate_content_for_audio(topic, style, duration):
     """
-    Generate content using Gemini (since it's already used in the project)
+    Generate content using Hugging Face chat completion API
     to be converted into audio.
     """
-    import google.generativeai as genai
-    
-    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-    if not GOOGLE_API_KEY:
-        raise ValueError("GOOGLE_API_KEY not found.")
-        
-    genai.configure(api_key=GOOGLE_API_KEY)
-    model = genai.GenerativeModel("gemini-2.5-flash")
-    
+
+    import os
+    from huggingface_hub import InferenceClient
+
+    api_key = os.getenv("HUGGINGFACE_API_KEY")
+
+    if not api_key:
+        raise ValueError("HUGGINGFACE_API_KEY not found.")
+
+    client = InferenceClient(
+        api_key=api_key,
+    )
+
     print(f"Generating script for topic: {topic}, style: {style}")
+
     prompt = f"""
-    You are an expert content creator. Generate a script for a {style} about the topic: "{topic}".
-    The script should be approximately {duration} minutes long when spoken.
-    
-    Style: {style}
-    Topic: {topic}
-    Estimated Duration: {duration} minutes
-    
-    Provide ONLY the script text, without any stage directions or meta-information.
-    """
-    
-    response = model.generate_content(prompt)
-    return response.text
+You are an expert content creator.
+
+Generate a script for a {style} about the topic: "{topic}".
+
+The script should be approximately {duration} minutes long when spoken.
+
+Style: {style}
+Topic: {topic}
+Estimated Duration: {duration} minutes
+
+Provide ONLY the script text, without any stage directions or meta-information.
+"""
+
+    completion = client.chat.completions.create(
+        model="deepseek-ai/DeepSeek-V4-Pro:novita",
+        messages=[
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        max_tokens=1200,
+        temperature=0.7,
+    )
+
+    return completion.choices[0].message.content
