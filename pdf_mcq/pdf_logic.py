@@ -6,8 +6,10 @@ import shutil # New import for deleting directories
 from dotenv import load_dotenv
 import uuid # Added for unique temporary directory names
 
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from pypdf import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 from langchain_google_genai import (
     GoogleGenerativeAIEmbeddings,
@@ -96,11 +98,14 @@ def create_vector_store(chunks_with_metadata, user_id=None):
             if 'metadata' not in item:
                 raise KeyError(f"Item at index {i} must have 'metadata' key")
         
-        embeddings = GoogleGenerativeAIEmbeddings(
-            model="gemini-embedding-001",
-            google_api_key=GOOGLE_API_KEY
-        )
+        # embeddings = GoogleGenerativeAIEmbeddings(
+        #     model="gemini-embedding-001",
+        #     google_api_key=GOOGLE_API_KEY
+        # )
         
+        embeddings = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2"
+        )
         # Extract texts and metadata for FAISS
         texts = [item['text'] for item in chunks_with_metadata]
         metadatas = [item['metadata'] for item in chunks_with_metadata]
@@ -125,9 +130,13 @@ def create_vector_store(chunks_with_metadata, user_id=None):
 def load_vector_store(user_id=None):
     """Load user-specific vector store from local directory."""
     try:
-        embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/gemini-embedding-001",  # Use the same model
-            google_api_key=GOOGLE_API_KEY
+        # embeddings = GoogleGenerativeAIEmbeddings(
+        #     model="models/gemini-embedding-001",  # Use the same model
+        #     google_api_key=GOOGLE_API_KEY
+        # )
+
+        embeddings = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2"
         )
         
         index_name_prefix = get_faiss_index_path(user_id)
@@ -315,9 +324,13 @@ def parse_json_mcqs(json_response):
 # -------- CONTEXT RETRIEVAL --------
 def get_context(query, user_id=None):
     """Retrieve relevant context from user-specific vector store"""
-    embeddings = GoogleGenerativeAIEmbeddings(
-        model="models/gemini-embedding-001",
-        google_api_key=GOOGLE_API_KEY
+    # embeddings = GoogleGenerativeAIEmbeddings(
+    #     model="models/gemini-embedding-001",
+    #     google_api_key=GOOGLE_API_KEY
+    # )
+
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
     )
 
     db = load_vector_store(user_id=user_id)
