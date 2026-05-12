@@ -5,16 +5,9 @@ import warnings
 import shutil # New import for deleting directories
 from dotenv import load_dotenv
 import uuid # Added for unique temporary directory names
-
-from langchain_community.embeddings import HuggingFaceEmbeddings
 from pypdf import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
-
-from langchain_google_genai import (
-    GoogleGenerativeAIEmbeddings,
-    ChatGoogleGenerativeAI
-)
 
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
@@ -37,6 +30,21 @@ else:
 # This means the index will be rebuilt on every cold start, leading to significant delays
 # for chatbot and summarization features. For persistent storage, a dedicated object storage
 # solution (like AWS S3) is recommended.
+
+_embedding_model = None
+
+def get_embeddings():
+    global _embedding_model
+
+    if _embedding_model is None:
+        from langchain_community.embeddings import HuggingFaceEmbeddings
+
+        _embedding_model = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2"
+        )
+
+    return _embedding_model
+
 def get_faiss_index_path(user_id):
     """Constructs the local path for a user's FAISS index."""
     return f"faiss_index_{user_id}"
@@ -103,9 +111,7 @@ def create_vector_store(chunks_with_metadata, user_id=None):
         #     google_api_key=GOOGLE_API_KEY
         # )
         
-        embeddings = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
-        )
+        embeddings = get_embeddings()
         # Extract texts and metadata for FAISS
         texts = [item['text'] for item in chunks_with_metadata]
         metadatas = [item['metadata'] for item in chunks_with_metadata]
@@ -127,37 +133,56 @@ def create_vector_store(chunks_with_metadata, user_id=None):
         raise Exception(f"Failed to create vector store: {str(e)}")
 
 
+# def load_vector_store(user_id=None):
+#     """Load user-specific vector store from local directory."""
+#     try:
+#         # embeddings = GoogleGenerativeAIEmbeddings(
+#         #     model="models/gemini-embedding-001",  # Use the same model
+#         #     google_api_key=GOOGLE_API_KEY
+#         # )
+
+#         embeddings = get_embeddings()
+        
+#         index_name_prefix = get_faiss_index_path(user_id)
+        
+#         if not os.path.exists(index_name_prefix):
+#             raise FileNotFoundError(f"Vector store {index_name_prefix} not found. Please upload PDFs first.")
+        
+#         db = FAISS.load_local(
+#             index_name_prefix,
+#             embeddings,
+#             allow_dangerous_deserialization=True
+#         )
+#         return db
+        
+#     except Exception as e:
+#         print(f"Error loading vector store: {e}")
+#         raise Exception(f"Failed to load vector store: {str(e)}")
+
+_vectorstores = {}
+
 def load_vector_store(user_id=None):
-    """Load user-specific vector store from local directory."""
-    try:
-        # embeddings = GoogleGenerativeAIEmbeddings(
-        #     model="models/gemini-embedding-001",  # Use the same model
-        #     google_api_key=GOOGLE_API_KEY
-        # )
+    global _vectorstores
 
-        embeddings = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
-        )
-        
-        index_name_prefix = get_faiss_index_path(user_id)
-        
-        if not os.path.exists(index_name_prefix):
-            raise FileNotFoundError(f"Vector store {index_name_prefix} not found. Please upload PDFs first.")
-        
-        db = FAISS.load_local(
-            index_name_prefix,
-            embeddings,
-            allow_dangerous_deserialization=True
-        )
-        return db
-        
-    except Exception as e:
-        print(f"Error loading vector store: {e}")
-        raise Exception(f"Failed to load vector store: {str(e)}")
+    if user_id in _vectorstores:
+        return _vectorstores[user_id]
 
+    embeddings = get_embeddings()
+
+    db = FAISS.load_local(
+        get_faiss_index_path(user_id),
+        embeddings,
+        allow_dangerous_deserialization=True
+    )
+
+    _vectorstores[user_id] = db
+
+    return db
 
 # -------- LLM (Gemini 2.5 Flash) --------
 def get_llm():
+    from langchain_google_genai import ChatGoogleGenerativeAI
+
     """Get the Gemini LLM - using Gemini 2.5 Flash"""
     return ChatGoogleGenerativeAI(
         model="gemini-2.5-flash",  # Confirmed available in 2026 environment
@@ -329,10 +354,7 @@ def get_context(query, user_id=None):
     #     google_api_key=GOOGLE_API_KEY
     # )
 
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
-
+    embeddings = get_embeddings()
     db = load_vector_store(user_id=user_id)
 
     docs = db.similarity_search(query, k=4)
