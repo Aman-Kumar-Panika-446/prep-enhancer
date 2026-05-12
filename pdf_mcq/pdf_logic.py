@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 import uuid # Added for unique temporary directory names
 from pypdf import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
 
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
@@ -31,16 +30,23 @@ else:
 # for chatbot and summarization features. For persistent storage, a dedicated object storage
 # solution (like AWS S3) is recommended.
 
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
+
 _embedding_model = None
 
 def get_embeddings():
     global _embedding_model
 
     if _embedding_model is None:
-        from langchain_community.embeddings import HuggingFaceEmbeddings
 
-        _embedding_model = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
+        api_key = os.getenv("HUGGINGFACE_API_KEY")
+
+        if not api_key:
+            raise ValueError("HUGGINGFACE_API_KEY not found")
+
+        _embedding_model = HuggingFaceEndpointEmbeddings(
+            huggingfacehub_api_token=api_key,
+            model="sentence-transformers/all-MiniLM-L6-v2"
         )
 
     return _embedding_model
