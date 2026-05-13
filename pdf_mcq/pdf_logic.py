@@ -287,6 +287,7 @@ def get_llm():
         raise ValueError("HUGGINGFACE_API_KEY not found.")
 
     return InferenceClient(
+        provider="novita",
         api_key=HF_API_KEY,
     )
 
@@ -351,7 +352,7 @@ Generate {mcq_count} MCQs now.
 
         try:
             completion = client.chat.completions.create(
-                model="deepseek-ai/DeepSeek-V4-Pro:novita",
+                model="deepseek-ai/DeepSeek-V4-Pro",
                 messages=[
                     {
                         "role": "user",
