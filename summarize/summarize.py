@@ -9,6 +9,7 @@ import re
 load_dotenv()
 
 client = InferenceClient(
+    provider="novita",
     api_key=os.getenv("HUGGINGFACE_API_KEY"),
 )
 
@@ -102,7 +103,7 @@ Summary:
 """
 
         completion = client.chat.completions.create(
-            model="deepseek-ai/DeepSeek-V4-Pro:novita",
+            model="deepseek-ai/DeepSeek-V4-Pro",
             messages=[
                 {
                     "role": "user",

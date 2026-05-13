@@ -95,6 +95,7 @@ def generate_content_for_audio(topic, style, duration):
         raise ValueError("HUGGINGFACE_API_KEY not found.")
 
     client = InferenceClient(
+        provider="novita",
         api_key=api_key,
     )
 
@@ -115,7 +116,7 @@ Provide ONLY the script text, without any stage directions or meta-information.
 """
 
     completion = client.chat.completions.create(
-        model="deepseek-ai/DeepSeek-V4-Pro:novita",
+        model="deepseek-ai/DeepSeek-V4-Pro",
         messages=[
             {
                 "role": "user",
