@@ -135,5 +135,5 @@ xxhash==3.6.0
 yarl==1.22.0
 youtube-transcript-api==1.2.4
 zstandard==0.25.0
-huggingface_hub
 huggingface_hub>=0.34.0
+langchain_huggingface
